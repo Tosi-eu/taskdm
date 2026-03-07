@@ -1,0 +1,8 @@
+{
+  "widget_width": 740,
+  "widget_height": 440,
+  "window_x": 780,
+  "window_y": 204,
+  "refresh_interval_ms": 2000,
+  "db_path": "db/tasks.db"
+}
