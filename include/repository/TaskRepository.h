@@ -15,7 +15,6 @@ public:
     
     bool initialize();
     
-    // CRUD operations
     std::optional<Task> create(const std::string& title, Priority priority);
     std::optional<Task> findById(int id);
     std::vector<Task> findAll(bool include_completed = false);
@@ -23,7 +22,6 @@ public:
     bool update(const Task& task);
     bool remove(int id);
     
-    // Specific operations
     bool markCompleted(int id, bool completed);
     bool updatePriority(int id, Priority priority);
     bool setSortOrder(int id, int sort_order);
@@ -34,6 +32,6 @@ private:
     Task taskFromRow(sqlite3_stmt* stmt);
 };
 
-} // namespace taskdm
+}
 
-#endif // TASK_REPOSITORY_H
+#endif

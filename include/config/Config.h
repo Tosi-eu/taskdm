@@ -21,6 +21,6 @@ struct Config {
     static std::string getDefaultConfigPath();
 };
 
-} // namespace taskdm
+}
 
-#endif // CONFIG_H
+#endif

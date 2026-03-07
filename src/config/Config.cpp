@@ -21,7 +21,7 @@ namespace {
         if (home.empty()) return "";
         return home + "/.local/share/taskdm/tasks.db";
     }
-} // namespace
+}
 
 bool Config::loadFromFile(const std::string& config_path) {
     std::ifstream file(config_path);
@@ -106,7 +106,6 @@ bool Config::saveToFile(const std::string& config_path) const {
 }
 
 std::string Config::getDefaultConfigPath() {
-    // Prefer XDG path when it exists so CLI and GUI (autostart/installed) use the same config.
     std::string xdg = getXdgConfigPath();
     if (!xdg.empty() && std::filesystem::exists(xdg))
         return xdg;

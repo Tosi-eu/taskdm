@@ -108,7 +108,6 @@ install(TARGETS task-cli task-gui
     RUNTIME DESTINATION bin
 )
 
-# task-dm como alias para task-gui
 install(CODE "
   file(CREATE_LINK \"task-gui\" \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/bin/task-dm\" SYMBOLIC)
 ")

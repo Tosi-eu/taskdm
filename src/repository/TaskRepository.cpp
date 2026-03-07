@@ -51,7 +51,6 @@ std::optional<Task> TaskRepository::create(const std::string& title, Priority pr
     int id = sqlite3_last_insert_rowid(db_.getHandle());
     sqlite3_finalize(stmt);
     
-    // Fetch the created task
     return findById(id);
 }
 
@@ -234,4 +233,4 @@ Task TaskRepository::taskFromRow(sqlite3_stmt* stmt) {
     );
 }
 
-} // namespace taskdm
+}

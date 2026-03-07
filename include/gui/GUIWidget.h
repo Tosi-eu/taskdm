@@ -8,7 +8,6 @@
 #include <vector>
 #include <chrono>
 
-// Forward declarations
 struct ImGuiContext;
 struct ImVec4;
 
@@ -43,10 +42,10 @@ private:
     bool mouse_left_down_prev_ = false;
     bool show_add_form_ = false;
     char new_task_buf_[256] = {};
-    int new_task_priority_idx_ = 1;  // 0=LOW, 1=MEDIUM, 2=HIGH, 3=URGENT
+    int new_task_priority_idx_ = 1;
     unsigned int check_tex_ = 0;
     unsigned int error_tex_ = 0;
-    bool use_native_title_bar_ = false;  // true on Linux: compositor handles drag (Wayland/X11)
+    bool use_native_title_bar_ = false;
 
     void updateTasks();
     void renderUI();
@@ -56,6 +55,6 @@ private:
     ImVec4 getPriorityColor(Priority priority) const;
 };
 
-} // namespace taskdm
+}
 
-#endif // GUI_WIDGET_H
+#endif

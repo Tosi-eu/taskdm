@@ -55,7 +55,6 @@ GLFWmonitor* getCurrentMonitor(GLFWwindow* window) {
     return best ? best : glfwGetPrimaryMonitor();
 }
 
-// Clamp (x, y) so a window of size (w, h) stays inside the monitor (for Wayland/X11 that reject off-screen)
 void clampPositionToMonitor(GLFWwindow* window, int w, int h, int* x, int* y) {
     GLFWmonitor* mon = window ? getCurrentMonitor(window) : glfwGetPrimaryMonitor();
     if (!mon) return;
@@ -85,7 +84,7 @@ unsigned int loadTextureFromFile(const char* path) {
     return static_cast<unsigned int>(tex);
 }
 
-} // namespace
+}
 
 namespace taskdm {
 
@@ -109,9 +108,6 @@ bool GUIWidget::initialize() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #if defined(__linux__)
-    // On Wayland, glfwSetWindowPos() is ignored (compositor owns position). On X11, undecorated
-    // drag can have compositor-specific issues. Using native title bar (decorated) lets the
-    // compositor handle drag on both X11 and Wayland (Pop!_OS, Ubuntu). See GLFW issue #2604.
     use_native_title_bar_ = (std::getenv("TASKDM_UNDECORATED") == nullptr);
     glfwWindowHint(GLFW_DECORATED, use_native_title_bar_ ? GLFW_TRUE : GLFW_FALSE);
 #else
@@ -188,7 +184,6 @@ void GUIWidget::setupInitialGeometry() {
         clampPositionToMonitor(window_, config_.widget_width, config_.widget_height, &x, &y);
         glfwSetWindowPos(window_, x, y);
     }
-    // Size is already set by glfwCreateWindow; resizable window will let user change it
 }
 
 void GUIWidget::saveWindowGeometry() {
@@ -236,15 +231,15 @@ void GUIWidget::updateTasks() {
 ImVec4 GUIWidget::getPriorityColor(Priority priority) const {
     switch (priority) {
         case Priority::LOW:
-            return ImVec4(0.5f, 0.5f, 0.5f, 1.0f); // Gray
+            return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
         case Priority::MEDIUM:
-            return ImVec4(1.0f, 1.0f, 0.0f, 1.0f); // Yellow
+            return ImVec4(1.0f, 1.0f, 0.0f, 1.0f);
         case Priority::HIGH:
-            return ImVec4(1.0f, 0.5f, 0.0f, 1.0f); // Orange
+            return ImVec4(1.0f, 0.5f, 0.0f, 1.0f);
         case Priority::URGENT:
-            return ImVec4(1.0f, 0.0f, 0.0f, 1.0f); // Red
+            return ImVec4(1.0f, 0.0f, 0.0f, 1.0f);
         default:
-            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f); // White
+            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }
 
@@ -261,7 +256,6 @@ void GUIWidget::renderUI() {
     auto config_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_config_check_).count();
     if (config_elapsed >= 1500) {
         last_config_check_ = now;
-        // Persist window geometry when user resizes/moves
         int x, y, w, h;
         glfwGetWindowPos(window_, &x, &y);
         glfwGetWindowSize(window_, &w, &h);
@@ -289,8 +283,6 @@ void GUIWidget::renderUI() {
         }
     }
 
-    // Drag: on Linux we use native title bar (decorated window) so compositor handles drag on Wayland/X11.
-    // On other platforms, use manual drag with real positions (GLFW-only input).
     if (!use_native_title_bar_) {
         int win_w, win_h;
         glfwGetWindowSize(window_, &win_w, &win_h);
@@ -328,7 +320,6 @@ void GUIWidget::renderUI() {
         mouse_left_down_prev_ = mouse_down;
     }
 
-    // Main window - use actual framebuffer size so content resizes with the window
     int fb_w, fb_h;
     glfwGetFramebufferSize(window_, &fb_w, &fb_h);
     ImGui::SetNextWindowSize(ImVec2(static_cast<float>(fb_w), static_cast<float>(fb_h)), ImGuiCond_Always);
@@ -546,4 +537,4 @@ void GUIWidget::shutdown() {
     glfwTerminate();
 }
 
-} // namespace taskdm
+}

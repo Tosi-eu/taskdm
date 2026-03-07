@@ -12,11 +12,9 @@ public:
     Database(const std::string& db_path);
     ~Database();
     
-    // Non-copyable
     Database(const Database&) = delete;
     Database& operator=(const Database&) = delete;
     
-    // Movable
     Database(Database&& other) noexcept;
     Database& operator=(Database&& other) noexcept;
     
@@ -34,6 +32,6 @@ private:
     void close();
 };
 
-} // namespace taskdm
+}
 
-#endif // DATABASE_H
+#endif

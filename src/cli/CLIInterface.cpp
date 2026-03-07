@@ -123,7 +123,6 @@ int CLIInterface::run(int argc, char* argv[]) {
         std::string title = argv[2];
         Priority priority = Priority::MEDIUM;
         
-        // Parse --priority flag
         for (int i = 3; i < argc; i++) {
             if (std::string(argv[i]) == "--priority" && i + 1 < argc) {
                 priority = Task::stringToPriority(argv[i + 1]);
@@ -198,4 +197,4 @@ int CLIInterface::run(int argc, char* argv[]) {
     }
 }
 
-} // namespace taskdm
+}

@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Setup script for Task Manager dependencies
-# This script downloads and sets up external dependencies
-
 set -e
 
 EXTERNAL_DIR="external"
@@ -10,10 +7,8 @@ IMGUI_DIR="${EXTERNAL_DIR}/imgui"
 
 echo "Setting up Task Manager dependencies..."
 
-# Create external directory if it doesn't exist
 mkdir -p "${EXTERNAL_DIR}"
 
-# Download Dear ImGui if not present
 if [ ! -d "${IMGUI_DIR}" ]; then
     echo "Downloading Dear ImGui..."
     cd "${EXTERNAL_DIR}"
