@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Task Manager
-Comment=Task Manager widget - your tasks on screen
-Exec=task-gui
-Icon=taskdm
-Terminal=false
-Categories=Utility;
-StartupWMClass=TaskDM

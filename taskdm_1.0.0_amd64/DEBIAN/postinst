@@ -1,7 +1,0 @@
-#!/bin/sh
-set -e
-if [ "$1" = "configure" ]; then
-    if [ -x /usr/bin/task-gui ] && [ ! -e /usr/bin/task-dm ]; then
-        ln -sf task-gui /usr/bin/task-dm
-    fi
-fi

@@ -40,3 +40,14 @@ external/imgui/
 external/cli11/
 install_root/
 task-dm*
+
+# User/runtime data
+config/config.json
+imgui.ini
+
+# Package build output
+taskdm_1.0.0_amd64/
+*.deb
+
+# Compile commands (CMake)
+compile_commands.json

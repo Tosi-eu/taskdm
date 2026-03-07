@@ -1,4 +1,0 @@
-#!/bin/sh
-if [ "$1" = "purge" ] && [ -L /usr/bin/task-dm ]; then
-    rm -f /usr/bin/task-dm
-fi
