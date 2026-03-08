@@ -116,6 +116,20 @@ std::vector<Task> TaskRepository::findCompleted() {
     return tasks;
 }
 
+std::vector<Task> TaskRepository::findCompletedByDate(const std::string& date_yyyy_mm_dd) {
+    std::vector<Task> tasks;
+    if (!db_.isOpen()) return tasks;
+    const char* sql = "SELECT id, title, priority, completed, created_at FROM tasks WHERE completed = 1 AND DATE(COALESCE(completed_at, created_at)) = ? ORDER BY COALESCE(completed_at, created_at) ASC, id ASC";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_.getHandle(), sql, -1, &stmt, nullptr) != SQLITE_OK) return tasks;
+    sqlite3_bind_text(stmt, 1, date_yyyy_mm_dd.c_str(), -1, SQLITE_STATIC);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        tasks.push_back(taskFromRow(stmt));
+    }
+    sqlite3_finalize(stmt);
+    return tasks;
+}
+
 bool TaskRepository::update(const Task& task) {
     if (!db_.isOpen()) {
         return false;
@@ -164,15 +178,16 @@ bool TaskRepository::markCompleted(int id, bool completed) {
         return false;
     }
     
-    const char* sql = "UPDATE tasks SET completed = ? WHERE id = ?";
+    const char* sql = completed
+        ? "UPDATE tasks SET completed = 1, completed_at = datetime('now') WHERE id = ?"
+        : "UPDATE tasks SET completed = 0, completed_at = NULL WHERE id = ?";
     sqlite3_stmt* stmt;
     
     if (sqlite3_prepare_v2(db_.getHandle(), sql, -1, &stmt, nullptr) != SQLITE_OK) {
         return false;
     }
     
-    sqlite3_bind_int(stmt, 1, completed ? 1 : 0);
-    sqlite3_bind_int(stmt, 2, id);
+    sqlite3_bind_int(stmt, 1, id);
     
     bool success = sqlite3_step(stmt) == SQLITE_DONE;
     sqlite3_finalize(stmt);

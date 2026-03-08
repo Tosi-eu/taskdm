@@ -22,6 +22,10 @@ std::vector<Task> TaskService::listCompletedTasks() {
     return repository_.findCompleted();
 }
 
+std::vector<Task> TaskService::listCompletedTasksByDate(const std::string& date_yyyy_mm_dd) {
+    return repository_.findCompletedByDate(date_yyyy_mm_dd);
+}
+
 bool TaskService::completeTask(int id) {
     return repository_.markCompleted(id, true);
 }

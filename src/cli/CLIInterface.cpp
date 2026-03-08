@@ -3,6 +3,8 @@
 #include "core/Task.h"
 #include <iostream>
 #include <iomanip>
+#include <ctime>
+#include <cstdio>
 namespace taskdm {
 
 int CLIInterface::runConfig(int argc, char* argv[]) {
@@ -106,6 +108,7 @@ int CLIInterface::run(int argc, char* argv[]) {
         std::cout << "  remove <id>                          Remove a task" << std::endl;
         std::cout << "  priority <id> <level>                Update task priority" << std::endl;
         std::cout << "  config get|set [key] [value]          Get or set widget/config options" << std::endl;
+        std::cout << "  history [YYYY-MM-DD]                   List completed tasks by day (default: today)" << std::endl;
         std::cout << "Priority levels: LOW, MEDIUM, HIGH, URGENT" << std::endl;
         return 1;
     }
@@ -141,6 +144,22 @@ int CLIInterface::run(int argc, char* argv[]) {
     }
     else if (command == "list") {
         auto tasks = service_.listTasks(false);
+        printTaskList(tasks);
+        return 0;
+    }
+    else if (command == "history") {
+        std::string date_arg;
+        if (argc >= 3) {
+            date_arg = argv[2];
+        } else {
+            std::time_t now = std::time(nullptr);
+            std::tm* tm = std::localtime(&now);
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+            date_arg = buf;
+        }
+        auto tasks = service_.listCompletedTasksByDate(date_arg);
+        std::cout << "Completed on " << date_arg << ":" << std::endl;
         printTaskList(tasks);
         return 0;
     }

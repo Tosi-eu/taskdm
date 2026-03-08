@@ -7,6 +7,8 @@
 #include <string>
 #include <chrono>
 #include <cstdio>
+#include <ctime>
+#include <sstream>
 #include <cstdint>
 #include <cstdlib>
 #include <filesystem>
@@ -92,6 +94,7 @@ GUIWidget::GUIWidget(TaskService& service, const Config& config)
     : service_(service), config_(config), window_(nullptr), imgui_context_(nullptr) {
     last_refresh_ = std::chrono::steady_clock::now();
     last_config_check_ = std::chrono::steady_clock::now();
+    history_date_ = getTodayDate();
 }
 
 GUIWidget::~GUIWidget() {
@@ -226,6 +229,55 @@ void GUIWidget::updateTasks() {
     current_tasks_ = service_.listTasks(false);
     finished_tasks_ = service_.listCompletedTasks();
     last_refresh_ = std::chrono::steady_clock::now();
+}
+
+void GUIWidget::updateHistoryTasks() {
+    history_tasks_ = service_.listCompletedTasksByDate(history_date_);
+}
+
+std::string GUIWidget::getTodayDate() const {
+    std::time_t now = std::time(nullptr);
+    std::tm* tm = std::localtime(&now);
+    if (!tm) return "0000-00-00";
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+    return std::string(buf);
+}
+
+std::string GUIWidget::getPrevDay(const std::string& date_yyyy_mm_dd) const {
+    int y, m, d;
+    if (std::sscanf(date_yyyy_mm_dd.c_str(), "%d-%d-%d", &y, &m, &d) != 3) return date_yyyy_mm_dd;
+    std::tm t = {};
+    t.tm_year = y - 1900;
+    t.tm_mon = m - 1;
+    t.tm_mday = d;
+    t.tm_isdst = -1;
+    std::time_t sec = std::mktime(&t);
+    if (sec == static_cast<std::time_t>(-1)) return date_yyyy_mm_dd;
+    sec -= 86400;
+    std::tm* next = std::localtime(&sec);
+    if (!next) return date_yyyy_mm_dd;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", next->tm_year + 1900, next->tm_mon + 1, next->tm_mday);
+    return std::string(buf);
+}
+
+std::string GUIWidget::getNextDay(const std::string& date_yyyy_mm_dd) const {
+    int y, m, d;
+    if (std::sscanf(date_yyyy_mm_dd.c_str(), "%d-%d-%d", &y, &m, &d) != 3) return date_yyyy_mm_dd;
+    std::tm t = {};
+    t.tm_year = y - 1900;
+    t.tm_mon = m - 1;
+    t.tm_mday = d;
+    t.tm_isdst = -1;
+    std::time_t sec = std::mktime(&t);
+    if (sec == static_cast<std::time_t>(-1)) return date_yyyy_mm_dd;
+    sec += 86400;
+    std::tm* next = std::localtime(&sec);
+    if (!next) return date_yyyy_mm_dd;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", next->tm_year + 1900, next->tm_mon + 1, next->tm_mday);
+    return std::string(buf);
 }
 
 ImVec4 GUIWidget::getPriorityColor(Priority priority) const {
@@ -474,6 +526,43 @@ void GUIWidget::renderUI() {
                         ImGui::PopID();
                         break;
                     }
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("History")) {
+            ImGui::Text("Completed by day");
+            ImGui::Separator();
+            if (history_date_.empty()) history_date_ = getTodayDate();
+            if (ImGui::Button("< Prev")) {
+                history_date_ = getPrevDay(history_date_);
+            }
+            ImGui::SameLine();
+            ImGui::Text("%s", history_date_.c_str());
+            ImGui::SameLine();
+            if (ImGui::Button("Next >")) {
+                history_date_ = getNextDay(history_date_);
+            }
+            if (history_date_ == getTodayDate()) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("(today)");
+            }
+            ImGui::Separator();
+            updateHistoryTasks();
+            if (history_tasks_.empty()) {
+                ImGui::Text("No tasks completed on this day");
+            } else {
+                for (const Task& task : history_tasks_) {
+                    ImGui::PushID(task.getId());
+                    if (check_tex_) {
+                        ImGui::Image((ImTextureID)(uintptr_t)check_tex_, ImVec2(16, 16));
+                        ImGui::SameLine();
+                    }
+                    ImVec4 color = getPriorityColor(task.getPriority());
+                    ImGui::PushStyleColor(ImGuiCol_Text, color);
+                    ImGui::TextUnformatted(task.getTitle().c_str());
+                    ImGui::PopStyleColor();
                     ImGui::PopID();
                 }
             }

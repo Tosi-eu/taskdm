@@ -91,6 +91,19 @@ bool Database::initializeSchema() {
     if (!execute("UPDATE tasks SET sort_order = id WHERE sort_order IS NULL")) {
         return false;
     }
+    char* err2 = nullptr;
+    int rc2 = sqlite3_exec(db_, "ALTER TABLE tasks ADD COLUMN completed_at DATETIME", nullptr, nullptr, &err2);
+    if (rc2 != SQLITE_OK && err2) {
+        if (std::strstr(err2, "duplicate column") == nullptr) {
+            std::cerr << "SQL error: " << err2 << std::endl;
+            sqlite3_free(err2);
+            return false;
+        }
+        sqlite3_free(err2);
+    }
+    if (!execute("UPDATE tasks SET completed_at = created_at WHERE completed = 1 AND completed_at IS NULL")) {
+        return false;
+    }
     return true;
 }
 

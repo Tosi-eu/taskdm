@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <chrono>
+#include <string>
 
 struct ImGuiContext;
 struct ImVec4;
@@ -30,6 +31,8 @@ private:
     
     std::vector<Task> current_tasks_;
     std::vector<Task> finished_tasks_;
+    std::vector<Task> history_tasks_;
+    std::string history_date_;
     std::chrono::steady_clock::time_point last_refresh_;
     std::chrono::steady_clock::time_point last_config_check_;
     struct DragState {
@@ -48,6 +51,10 @@ private:
     bool use_native_title_bar_ = false;
 
     void updateTasks();
+    void updateHistoryTasks();
+    std::string getTodayDate() const;
+    std::string getPrevDay(const std::string& date_yyyy_mm_dd) const;
+    std::string getNextDay(const std::string& date_yyyy_mm_dd) const;
     void renderUI();
     void setupInitialGeometry();
     void setWindowIcon();
