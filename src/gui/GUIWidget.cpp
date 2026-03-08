@@ -95,6 +95,8 @@ GUIWidget::GUIWidget(TaskService& service, const Config& config)
     last_refresh_ = std::chrono::steady_clock::now();
     last_config_check_ = std::chrono::steady_clock::now();
     history_date_ = getTodayDate();
+    std::snprintf(history_from_buf_, sizeof(history_from_buf_), "%s", history_date_.c_str());
+    std::snprintf(history_to_buf_, sizeof(history_to_buf_), "%s", history_date_.c_str());
 }
 
 GUIWidget::~GUIWidget() {
@@ -233,6 +235,14 @@ void GUIWidget::updateTasks() {
 
 void GUIWidget::updateHistoryTasks() {
     history_tasks_ = service_.listCompletedTasksByDate(history_date_);
+}
+
+void GUIWidget::updateHistoryTasksRange() {
+    std::string from_str(history_from_buf_);
+    std::string to_str(history_to_buf_);
+    if (from_str.empty() || to_str.empty()) return;
+    if (from_str > to_str) std::swap(from_str, to_str);
+    history_tasks_ = service_.listCompletedTasksByDateRange(from_str, to_str);
 }
 
 std::string GUIWidget::getTodayDate() const {
@@ -532,26 +542,39 @@ void GUIWidget::renderUI() {
             ImGui::EndTabItem();
         }
         if (ImGui::BeginTabItem("History")) {
-            ImGui::Text("Completed by day");
+            ImGui::Text("Completed tasks");
             ImGui::Separator();
             if (history_date_.empty()) history_date_ = getTodayDate();
-            if (ImGui::Button("< Prev")) {
-                history_date_ = getPrevDay(history_date_);
-            }
-            ImGui::SameLine();
-            ImGui::Text("%s", history_date_.c_str());
-            ImGui::SameLine();
-            if (ImGui::Button("Next >")) {
-                history_date_ = getNextDay(history_date_);
-            }
-            if (history_date_ == getTodayDate()) {
+            ImGui::Checkbox("Date range (from / to)", &history_use_range_);
+            if (history_use_range_) {
+                ImGui::SetNextItemWidth(120);
+                ImGui::InputTextWithHint("##from", "From (YYYY-MM-DD)", history_from_buf_, sizeof(history_from_buf_));
                 ImGui::SameLine();
-                ImGui::TextDisabled("(today)");
+                ImGui::SetNextItemWidth(120);
+                ImGui::InputTextWithHint("##to", "To (YYYY-MM-DD)", history_to_buf_, sizeof(history_to_buf_));
+                ImGui::SameLine();
+                if (ImGui::Button("Search")) {
+                    updateHistoryTasksRange();
+                }
+            } else {
+                if (ImGui::Button("< Prev")) {
+                    history_date_ = getPrevDay(history_date_);
+                }
+                ImGui::SameLine();
+                ImGui::Text("%s", history_date_.c_str());
+                ImGui::SameLine();
+                if (ImGui::Button("Next >")) {
+                    history_date_ = getNextDay(history_date_);
+                }
+                if (history_date_ == getTodayDate()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(today)");
+                }
+                updateHistoryTasks();
             }
             ImGui::Separator();
-            updateHistoryTasks();
             if (history_tasks_.empty()) {
-                ImGui::Text("No tasks completed on this day");
+                ImGui::Text("%s", history_use_range_ ? "No tasks in this range" : "No tasks completed on this day");
             } else {
                 for (const Task& task : history_tasks_) {
                     ImGui::PushID(task.getId());

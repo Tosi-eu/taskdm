@@ -16,6 +16,7 @@ public:
     std::vector<Task> listTasks(bool include_completed = false);
     std::vector<Task> listCompletedTasks();
     std::vector<Task> listCompletedTasksByDate(const std::string& date_yyyy_mm_dd);
+    std::vector<Task> listCompletedTasksByDateRange(const std::string& from_yyyy_mm_dd, const std::string& to_yyyy_mm_dd);
     bool completeTask(int id);
     bool removeTask(int id);
     bool updateTaskPriority(int id, Priority priority);

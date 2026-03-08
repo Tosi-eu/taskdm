@@ -130,6 +130,21 @@ std::vector<Task> TaskRepository::findCompletedByDate(const std::string& date_yy
     return tasks;
 }
 
+std::vector<Task> TaskRepository::findCompletedByDateRange(const std::string& from_yyyy_mm_dd, const std::string& to_yyyy_mm_dd) {
+    std::vector<Task> tasks;
+    if (!db_.isOpen()) return tasks;
+    const char* sql = "SELECT id, title, priority, completed, created_at FROM tasks WHERE completed = 1 AND DATE(COALESCE(completed_at, created_at)) >= ? AND DATE(COALESCE(completed_at, created_at)) <= ? ORDER BY COALESCE(completed_at, created_at) ASC, id ASC";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(db_.getHandle(), sql, -1, &stmt, nullptr) != SQLITE_OK) return tasks;
+    sqlite3_bind_text(stmt, 1, from_yyyy_mm_dd.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, to_yyyy_mm_dd.c_str(), -1, SQLITE_STATIC);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        tasks.push_back(taskFromRow(stmt));
+    }
+    sqlite3_finalize(stmt);
+    return tasks;
+}
+
 bool TaskRepository::update(const Task& task) {
     if (!db_.isOpen()) {
         return false;

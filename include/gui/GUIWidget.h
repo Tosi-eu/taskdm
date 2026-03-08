@@ -33,6 +33,9 @@ private:
     std::vector<Task> finished_tasks_;
     std::vector<Task> history_tasks_;
     std::string history_date_;
+    bool history_use_range_ = false;
+    char history_from_buf_[32] = {};
+    char history_to_buf_[32] = {};
     std::chrono::steady_clock::time_point last_refresh_;
     std::chrono::steady_clock::time_point last_config_check_;
     struct DragState {
@@ -52,6 +55,7 @@ private:
 
     void updateTasks();
     void updateHistoryTasks();
+    void updateHistoryTasksRange();
     std::string getTodayDate() const;
     std::string getPrevDay(const std::string& date_yyyy_mm_dd) const;
     std::string getNextDay(const std::string& date_yyyy_mm_dd) const;
