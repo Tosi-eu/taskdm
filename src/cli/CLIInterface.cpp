@@ -3,6 +3,8 @@
 #include "core/Task.h"
 #include <iostream>
 #include <iomanip>
+#include <ctime>
+#include <cstdio>
 namespace taskdm {
 
 int CLIInterface::runConfig(int argc, char* argv[]) {
@@ -106,6 +108,8 @@ int CLIInterface::run(int argc, char* argv[]) {
         std::cout << "  remove <id>                          Remove a task" << std::endl;
         std::cout << "  priority <id> <level>                Update task priority" << std::endl;
         std::cout << "  config get|set [key] [value]          Get or set widget/config options" << std::endl;
+        std::cout << "  history [YYYY-MM-DD]                    List completed tasks on one day (default: today)" << std::endl;
+        std::cout << "  history YYYY-MM-DD YYYY-MM-DD           List completed tasks in date range" << std::endl;
         std::cout << "Priority levels: LOW, MEDIUM, HIGH, URGENT" << std::endl;
         return 1;
     }
@@ -142,6 +146,27 @@ int CLIInterface::run(int argc, char* argv[]) {
     else if (command == "list") {
         auto tasks = service_.listTasks(false);
         printTaskList(tasks);
+        return 0;
+    }
+    else if (command == "history") {
+        std::time_t now = std::time(nullptr);
+        std::tm* tm = std::localtime(&now);
+        char today_buf[32];
+        std::snprintf(today_buf, sizeof(today_buf), "%04d-%02d-%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+        std::string today_str(today_buf);
+        if (argc >= 4) {
+            std::string from_str = argv[2];
+            std::string to_str = argv[3];
+            if (from_str > to_str) std::swap(from_str, to_str);
+            auto tasks = service_.listCompletedTasksByDateRange(from_str, to_str);
+            std::cout << "Completed between " << from_str << " and " << to_str << ":" << std::endl;
+            printTaskList(tasks);
+        } else {
+            std::string date_arg = (argc >= 3) ? argv[2] : today_str;
+            auto tasks = service_.listCompletedTasksByDate(date_arg);
+            std::cout << "Completed on " << date_arg << ":" << std::endl;
+            printTaskList(tasks);
+        }
         return 0;
     }
     else if (command == "done") {

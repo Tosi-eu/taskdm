@@ -19,6 +19,8 @@ public:
     std::optional<Task> findById(int id);
     std::vector<Task> findAll(bool include_completed = false);
     std::vector<Task> findCompleted();
+    std::vector<Task> findCompletedByDate(const std::string& date_yyyy_mm_dd);
+    std::vector<Task> findCompletedByDateRange(const std::string& from_yyyy_mm_dd, const std::string& to_yyyy_mm_dd);
     bool update(const Task& task);
     bool remove(int id);
     

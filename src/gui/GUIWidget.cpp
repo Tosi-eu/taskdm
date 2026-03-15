@@ -7,9 +7,16 @@
 #include <string>
 #include <chrono>
 #include <cstdio>
+#include <ctime>
+#include <sstream>
 #include <cstdint>
 #include <cstdlib>
+#include <cmath>
 #include <filesystem>
+#include <cstring>
+#if defined(__linux__) || defined(__FreeBSD__)
+#include <unistd.h>
+#endif
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb/stb_image.h"
@@ -92,6 +99,10 @@ GUIWidget::GUIWidget(TaskService& service, const Config& config)
     : service_(service), config_(config), window_(nullptr), imgui_context_(nullptr) {
     last_refresh_ = std::chrono::steady_clock::now();
     last_config_check_ = std::chrono::steady_clock::now();
+    last_toaster_time_ = std::chrono::steady_clock::now();
+    history_date_ = getTodayDate();
+    std::snprintf(history_from_buf_, sizeof(history_from_buf_), "%s", history_date_.c_str());
+    std::snprintf(history_to_buf_, sizeof(history_to_buf_), "%s", history_date_.c_str());
 }
 
 GUIWidget::~GUIWidget() {
@@ -228,6 +239,63 @@ void GUIWidget::updateTasks() {
     last_refresh_ = std::chrono::steady_clock::now();
 }
 
+void GUIWidget::updateHistoryTasks() {
+    history_tasks_ = service_.listCompletedTasksByDate(history_date_);
+}
+
+void GUIWidget::updateHistoryTasksRange() {
+    std::string from_str(history_from_buf_);
+    std::string to_str(history_to_buf_);
+    if (from_str.empty() || to_str.empty()) return;
+    if (from_str > to_str) std::swap(from_str, to_str);
+    history_tasks_ = service_.listCompletedTasksByDateRange(from_str, to_str);
+}
+
+std::string GUIWidget::getTodayDate() const {
+    std::time_t now = std::time(nullptr);
+    std::tm* tm = std::localtime(&now);
+    if (!tm) return "0000-00-00";
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday);
+    return std::string(buf);
+}
+
+std::string GUIWidget::getPrevDay(const std::string& date_yyyy_mm_dd) const {
+    int y, m, d;
+    if (std::sscanf(date_yyyy_mm_dd.c_str(), "%d-%d-%d", &y, &m, &d) != 3) return date_yyyy_mm_dd;
+    std::tm t = {};
+    t.tm_year = y - 1900;
+    t.tm_mon = m - 1;
+    t.tm_mday = d;
+    t.tm_isdst = -1;
+    std::time_t sec = std::mktime(&t);
+    if (sec == static_cast<std::time_t>(-1)) return date_yyyy_mm_dd;
+    sec -= 86400;
+    std::tm* next = std::localtime(&sec);
+    if (!next) return date_yyyy_mm_dd;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", next->tm_year + 1900, next->tm_mon + 1, next->tm_mday);
+    return std::string(buf);
+}
+
+std::string GUIWidget::getNextDay(const std::string& date_yyyy_mm_dd) const {
+    int y, m, d;
+    if (std::sscanf(date_yyyy_mm_dd.c_str(), "%d-%d-%d", &y, &m, &d) != 3) return date_yyyy_mm_dd;
+    std::tm t = {};
+    t.tm_year = y - 1900;
+    t.tm_mon = m - 1;
+    t.tm_mday = d;
+    t.tm_isdst = -1;
+    std::time_t sec = std::mktime(&t);
+    if (sec == static_cast<std::time_t>(-1)) return date_yyyy_mm_dd;
+    sec += 86400;
+    std::tm* next = std::localtime(&sec);
+    if (!next) return date_yyyy_mm_dd;
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02d", next->tm_year + 1900, next->tm_mon + 1, next->tm_mday);
+    return std::string(buf);
+}
+
 ImVec4 GUIWidget::getPriorityColor(Priority priority) const {
     switch (priority) {
         case Priority::LOW:
@@ -241,6 +309,147 @@ ImVec4 GUIWidget::getPriorityColor(Priority priority) const {
         default:
             return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
     }
+}
+
+int GUIWidget::getToasterIntervalMsForPriority(Priority p) const {
+    switch (p) {
+        case Priority::LOW:    return config_.toaster_interval_low_ms;
+        case Priority::MEDIUM: return config_.toaster_interval_medium_ms;
+        case Priority::HIGH:   return config_.toaster_interval_high_ms;
+        case Priority::URGENT: return config_.toaster_interval_urgent_ms;
+        default:              return config_.toaster_interval_medium_ms;
+    }
+}
+
+int GUIWidget::getNextToasterIntervalMs() const {
+    int min_interval = 0;
+    for (const Task& t : current_tasks_) {
+        int iv = getToasterIntervalMsForPriority(t.getPriority());
+        if (min_interval == 0 || iv < min_interval) min_interval = iv;
+    }
+    return min_interval;
+}
+
+bool GUIWidget::isWayland() {
+    const char* wayland = std::getenv("WAYLAND_DISPLAY");
+    return wayland != nullptr && wayland[0] != '\0';
+}
+
+void GUIWidget::playNotificationSound() {
+#if defined(__linux__) || defined(__FreeBSD__)
+    if (!config_.toaster_sound_enabled) return;
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (execlp("canberra-gtk-play", "canberra-gtk-play", "-i", "message-new-instant",
+                   static_cast<char*>(nullptr)) == -1) {
+            execlp("paplay", "paplay", "/usr/share/sounds/freedesktop/stereo/message.oga",
+                   static_cast<char*>(nullptr));
+        }
+        _exit(127);
+    }
+#endif
+}
+
+void GUIWidget::sendWaylandNotification() {
+#if defined(__linux__) || defined(__FreeBSD__)
+    std::string body;
+    for (size_t i = 0; i < current_tasks_.size(); ++i) {
+        if (!body.empty()) body += '\n';
+        body += "• ";
+        body += current_tasks_[i].getTitle();
+    }
+    if (body.empty()) body = "Open TaskDM to see tasks.";
+    int timeout_ms = (config_.toaster_duration_ms > 0 ? config_.toaster_duration_ms : 10000);
+    std::string timeout_str = std::to_string(timeout_ms);
+    pid_t pid = fork();
+    if (pid == 0) {
+        execlp("notify-send", "notify-send", "-a", "TaskDM", "-u", "normal",
+               "-t", timeout_str.c_str(),
+               "Uncompleted tasks", body.c_str(), static_cast<char*>(nullptr));
+        _exit(127);
+    }
+#endif
+}
+
+void GUIWidget::ensureToasterWindow() {
+    if (toaster_window_) return;
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+#if GLFW_VERSION_MAJOR > 3 || (GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 4)
+    glfwWindowHint(GLFW_ALWAYS_ON_TOP, GLFW_TRUE);
+#endif
+    glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+    toaster_window_ = glfwCreateWindow(320, 140, "TaskDM Toaster", nullptr, window_);
+    if (!toaster_window_) return;
+    glfwSetWindowAttrib(toaster_window_, GLFW_DECORATED, GLFW_FALSE);
+}
+
+void GUIWidget::positionToasterOnMonitor(float shake_x) {
+    if (!toaster_window_) return;
+    const int toaster_w = 320;
+    const int toaster_h = 140;
+    const int margin = 24;
+    GLFWmonitor* mon = glfwGetPrimaryMonitor();
+    if (!mon) return;
+    int mx, my, mw, mh;
+#if GLFW_VERSION_MAJOR > 3 || (GLFW_VERSION_MAJOR == 3 && GLFW_VERSION_MINOR >= 3)
+    glfwGetMonitorWorkarea(mon, &mx, &my, &mw, &mh);
+#else
+    {
+        glfwGetMonitorPos(mon, &mx, &my);
+        const GLFWvidmode* mode = glfwGetVideoMode(mon);
+        mw = mode ? mode->width : 800;
+        mh = mode ? mode->height : 600;
+    }
+#endif
+    int pos_type = config_.toaster_position;
+    int pos_x = mx + margin + static_cast<int>(shake_x);
+    int pos_y = my + margin;
+    if (pos_type == 1) {
+        pos_x = mx + mw - toaster_w - margin + static_cast<int>(shake_x);
+        pos_y = my + mh - toaster_h - margin;
+    } else if (pos_type == 2) {
+        pos_x = mx + mw - toaster_w - margin + static_cast<int>(shake_x);
+        pos_y = my + margin;
+    } else if (pos_type == 3) {
+        pos_x = mx + margin + static_cast<int>(shake_x);
+        pos_y = my + mh - toaster_h - margin;
+    }
+    glfwSetWindowPos(toaster_window_, pos_x, pos_y);
+}
+
+void GUIWidget::renderToaster() {
+    const float toaster_w = 320.f;
+    const float toaster_h = 140.f;
+    ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(toaster_w, toaster_h), ImGuiCond_Always);
+    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+        | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse;
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.15f, 0.15f, 0.18f, 0.95f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.f, 10.f));
+    if (ImGui::Begin("##Toaster", nullptr, flags)) {
+        ImGui::TextColored(ImVec4(1.f, 0.85f, 0.4f, 1.f), "Uncompleted tasks");
+        ImGui::Separator();
+        const size_t max_show = 5;
+        for (size_t i = 0; i < current_tasks_.size() && i < max_show; ++i) {
+            const Task& task = current_tasks_[i];
+            ImVec4 color = getPriorityColor(task.getPriority());
+            ImGui::PushStyleColor(ImGuiCol_Text, color);
+            ImGui::BulletText("%s", task.getTitle().c_str());
+            ImGui::PopStyleColor();
+        }
+        if (current_tasks_.size() > max_show) {
+            ImGui::TextDisabled("+ %zu more", current_tasks_.size() - max_show);
+        }
+    }
+    ImGui::End();
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
 }
 
 void GUIWidget::renderUI() {
@@ -280,6 +489,15 @@ void GUIWidget::renderUI() {
             }
             config_.refresh_interval_ms = fresh.refresh_interval_ms;
             config_.db_path = fresh.db_path;
+            config_.toaster_enabled = fresh.toaster_enabled;
+            config_.toaster_first_delay_ms = fresh.toaster_first_delay_ms;
+            config_.toaster_interval_urgent_ms = fresh.toaster_interval_urgent_ms;
+            config_.toaster_interval_high_ms = fresh.toaster_interval_high_ms;
+            config_.toaster_interval_medium_ms = fresh.toaster_interval_medium_ms;
+            config_.toaster_interval_low_ms = fresh.toaster_interval_low_ms;
+            config_.toaster_duration_ms = fresh.toaster_duration_ms;
+            config_.toaster_position = fresh.toaster_position;
+            config_.toaster_sound_enabled = fresh.toaster_sound_enabled;
         }
     }
 
@@ -479,9 +697,85 @@ void GUIWidget::renderUI() {
             }
             ImGui::EndTabItem();
         }
+        if (ImGui::BeginTabItem("History")) {
+            ImGui::Text("Completed tasks");
+            ImGui::Separator();
+            if (history_date_.empty()) history_date_ = getTodayDate();
+            ImGui::Checkbox("Date range (from / to)", &history_use_range_);
+            if (history_use_range_) {
+                ImGui::SetNextItemWidth(120);
+                ImGui::InputTextWithHint("##from", "From (YYYY-MM-DD)", history_from_buf_, sizeof(history_from_buf_));
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120);
+                ImGui::InputTextWithHint("##to", "To (YYYY-MM-DD)", history_to_buf_, sizeof(history_to_buf_));
+                ImGui::SameLine();
+                if (ImGui::Button("Search")) {
+                    updateHistoryTasksRange();
+                }
+            } else {
+                if (ImGui::Button("< Prev")) {
+                    history_date_ = getPrevDay(history_date_);
+                }
+                ImGui::SameLine();
+                ImGui::Text("%s", history_date_.c_str());
+                ImGui::SameLine();
+                if (ImGui::Button("Next >")) {
+                    history_date_ = getNextDay(history_date_);
+                }
+                if (history_date_ == getTodayDate()) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("(today)");
+                }
+                updateHistoryTasks();
+            }
+            ImGui::Separator();
+            if (history_tasks_.empty()) {
+                ImGui::Text("%s", history_use_range_ ? "No tasks in this range" : "No tasks completed on this day");
+            } else {
+                for (const Task& task : history_tasks_) {
+                    ImGui::PushID(task.getId());
+                    if (check_tex_) {
+                        ImGui::Image((ImTextureID)(uintptr_t)check_tex_, ImVec2(16, 16));
+                        ImGui::SameLine();
+                    }
+                    ImVec4 color = getPriorityColor(task.getPriority());
+                    ImGui::PushStyleColor(ImGuiCol_Text, color);
+                    ImGui::TextUnformatted(task.getTitle().c_str());
+                    ImGui::PopStyleColor();
+                    ImGui::PopID();
+                }
+            }
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
     ImGui::End();
+
+    if (config_.toaster_enabled && !current_tasks_.empty()) {
+        auto now = std::chrono::steady_clock::now();
+        if (toaster_visible_) {
+            auto visible_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - toaster_show_start_).count();
+            if (visible_elapsed >= config_.toaster_duration_ms) {
+                toaster_visible_ = false;
+                if (toaster_window_) glfwHideWindow(toaster_window_);
+            }
+        } else {
+            int interval_ms = getNextToasterIntervalMs();
+            if (interval_ms <= 0) interval_ms = 60000;
+            int delay_ms = toaster_has_shown_once_ ? interval_ms : config_.toaster_first_delay_ms;
+            if (delay_ms <= 0) delay_ms = 30000;
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - last_toaster_time_).count();
+            if (elapsed >= delay_ms) {
+                toaster_visible_ = true;
+                toaster_show_start_ = now;
+                last_toaster_time_ = now;
+                toaster_has_shown_once_ = true;
+                toaster_shake_time_ = 0.f;
+                playNotificationSound();
+                if (isWayland()) sendWaylandNotification();
+            }
+        }
+    }
     
     ImGui::Render();
     
@@ -494,6 +788,32 @@ void GUIWidget::renderUI() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     
     glfwSwapBuffers(window_);
+
+    if (toaster_visible_ && !isWayland()) {
+        ensureToasterWindow();
+        if (toaster_window_) {
+            toaster_shake_time_ += ImGui::GetIO().DeltaTime;
+            const float shake_amplitude = 4.f;
+            const float shake_freq = 28.f;
+            float shake_x = shake_amplitude * std::sin(toaster_shake_time_ * shake_freq)
+                + shake_amplitude * 0.4f * std::sin(toaster_shake_time_ * 17.f + 1.f);
+            positionToasterOnMonitor(shake_x);
+            glfwShowWindow(toaster_window_);
+            glfwMakeContextCurrent(toaster_window_);
+            ImGuiIO& io = ImGui::GetIO();
+            io.DisplaySize = ImVec2(320.f, 140.f);
+            io.DeltaTime = (io.DeltaTime > 0.f ? io.DeltaTime : 0.016f);
+            ImGui::NewFrame();
+            renderToaster();
+            ImGui::Render();
+            glViewport(0, 0, 320, 140);
+            glClearColor(0.15f, 0.15f, 0.18f, 0.95f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            glfwSwapBuffers(toaster_window_);
+            glfwMakeContextCurrent(window_);
+        }
+    }
 }
 
 void GUIWidget::run() {
@@ -529,6 +849,10 @@ void GUIWidget::shutdown() {
         imgui_context_ = nullptr;
     }
     
+    if (toaster_window_) {
+        glfwDestroyWindow(toaster_window_);
+        toaster_window_ = nullptr;
+    }
     if (window_) {
         glfwDestroyWindow(window_);
         window_ = nullptr;

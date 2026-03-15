@@ -124,6 +124,22 @@ sudo apt remove taskdm
 
 Or with dpkg: `sudo dpkg -r taskdm`. This removes the binaries; your config (`~/.config/taskdm/`) and data (`~/.local/share/taskdm/`) are left in place. To remove those too: `rm -rf ~/.config/taskdm ~/.local/share/taskdm`. Disable autostart if you set it up: `rm ~/.config/autostart/task-dm.desktop`.
 
+## Toaster notifications (uncompleted tasks)
+
+When there are active tasks, you get a reminder:
+
+- **Wayland**: uses **system notifications** (`notify-send`). The **position is set by your compositor** (e.g. GNOME, KDE, Sway), often top-right — to change it, configure the desktop/notification daemon, not TaskDM. Requires `libnotify-bin` (e.g. `sudo apt install libnotify-bin`). A **notification sound** is played if `toaster_sound_enabled` is on (default); uses `canberra-gtk-play` or `paplay` (install `libcanberra-gtk3` or have PulseAudio + freedesktop sound theme).
+- **X11**: a **separate toaster window** appears on the monitor (small popup with shake animation). Its position is controlled by `toaster_position` (default bottom-right).
+
+Intervals are **shorter for higher priority** (URGENT more often, LOW less often). Configure in `config.json`:
+
+- `toaster_enabled`: 1 or 0
+- `toaster_first_delay_ms`: milliseconds before the **first** notification (default 30000 = 30 sec)
+- `toaster_interval_urgent_ms`, `toaster_interval_high_ms`, `toaster_interval_medium_ms`, `toaster_interval_low_ms`: milliseconds between **later** reminders (defaults: 5min, 15min, 30min, 60min)
+- `toaster_duration_ms`: how long the toaster/notification stays visible in ms (default 10000 = 10s)
+- `toaster_position`: **only on X11** (toaster window). 0=top-left, **1=bottom-right (default)**, 2=top-right, 3=bottom-left. On Wayland the position is set by the compositor.
+- `toaster_sound_enabled`: 1 or 0 — play a sound when the reminder appears (default 1)
+
 ## Config command (widget position / monitor corner)
 
 Customize where the widget appears on the monitor:
