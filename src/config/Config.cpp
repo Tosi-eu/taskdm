@@ -79,6 +79,25 @@ bool Config::loadFromFile(const std::string& config_path) {
     std::string db_path_val = findValue("db_path");
     if (!db_path_val.empty()) db_path = db_path_val;
     
+    int toaster_enabled_val = findIntValue("toaster_enabled");
+    if (toaster_enabled_val >= 0) toaster_enabled = (toaster_enabled_val != 0);
+    int tfirst = findIntValue("toaster_first_delay_ms");
+    if (tfirst >= 0) toaster_first_delay_ms = tfirst;
+    int ti_urgent = findIntValue("toaster_interval_urgent_ms");
+    if (ti_urgent > 0) toaster_interval_urgent_ms = ti_urgent;
+    int ti_high = findIntValue("toaster_interval_high_ms");
+    if (ti_high > 0) toaster_interval_high_ms = ti_high;
+    int ti_medium = findIntValue("toaster_interval_medium_ms");
+    if (ti_medium > 0) toaster_interval_medium_ms = ti_medium;
+    int ti_low = findIntValue("toaster_interval_low_ms");
+    if (ti_low > 0) toaster_interval_low_ms = ti_low;
+    int td = findIntValue("toaster_duration_ms");
+    if (td > 0) toaster_duration_ms = td;
+    int tp = findIntValue("toaster_position");
+    if (tp >= 0) toaster_position = tp;
+    int ts = findIntValue("toaster_sound_enabled");
+    if (ts >= 0) toaster_sound_enabled = (ts != 0);
+    
     return true;
 }
 
@@ -99,7 +118,16 @@ bool Config::saveToFile(const std::string& config_path) const {
     file << "  \"window_x\": " << window_x << ",\n";
     file << "  \"window_y\": " << window_y << ",\n";
     file << "  \"refresh_interval_ms\": " << refresh_interval_ms << ",\n";
-    file << "  \"db_path\": \"" << db_path << "\"\n";
+    file << "  \"db_path\": \"" << db_path << "\",\n";
+    file << "  \"toaster_enabled\": " << (toaster_enabled ? 1 : 0) << ",\n";
+    file << "  \"toaster_first_delay_ms\": " << toaster_first_delay_ms << ",\n";
+    file << "  \"toaster_interval_urgent_ms\": " << toaster_interval_urgent_ms << ",\n";
+    file << "  \"toaster_interval_high_ms\": " << toaster_interval_high_ms << ",\n";
+    file << "  \"toaster_interval_medium_ms\": " << toaster_interval_medium_ms << ",\n";
+    file << "  \"toaster_interval_low_ms\": " << toaster_interval_low_ms << ",\n";
+    file << "  \"toaster_duration_ms\": " << toaster_duration_ms << ",\n";
+    file << "  \"toaster_position\": " << toaster_position << ",\n";
+    file << "  \"toaster_sound_enabled\": " << (toaster_sound_enabled ? 1 : 0) << "\n";
     file << "}\n";
     
     return true;

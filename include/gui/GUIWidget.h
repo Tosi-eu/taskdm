@@ -27,6 +27,7 @@ private:
     TaskService& service_;
     Config config_;
     GLFWwindow* window_;
+    GLFWwindow* toaster_window_ = nullptr;
     ImGuiContext* imgui_context_;
     
     std::vector<Task> current_tasks_;
@@ -52,6 +53,20 @@ private:
     unsigned int check_tex_ = 0;
     unsigned int error_tex_ = 0;
     bool use_native_title_bar_ = false;
+    bool toaster_visible_ = false;
+    bool toaster_has_shown_once_ = false;
+    std::chrono::steady_clock::time_point toaster_show_start_;
+    std::chrono::steady_clock::time_point last_toaster_time_;
+    float toaster_shake_time_ = 0.f;
+
+    int getToasterIntervalMsForPriority(Priority p) const;
+    int getNextToasterIntervalMs() const;
+    static bool isWayland();
+    void playNotificationSound();
+    void sendWaylandNotification();
+    void ensureToasterWindow();
+    void positionToasterOnMonitor(float shake_x);
+    void renderToaster();
 
     void updateTasks();
     void updateHistoryTasks();
